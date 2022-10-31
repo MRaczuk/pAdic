@@ -1,14 +1,11 @@
-import pytest
 from math import log, ceil
-from sympy import isprime, nextprime
-from hypothesis import given, settings, Verbosity, note, assume
+from sympy import nextprime
+from hypothesis import given, note
 from hypothesis.strategies import integers, composite
 from padic import Padic
 
 zero = lambda p: Padic.from_int(100, 0, p)
-# choosen_primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31,
-#                   37, 97, 101, 103, 107, 109, 997, 2137,
-#                   10**9 + 7]
+# pytest -s --hypothesis-show-statistics
 
 
 @composite
