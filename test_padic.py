@@ -4,12 +4,12 @@ from hypothesis import given, note
 from hypothesis.strategies import integers, composite
 from padic import Padic
 
-zero = lambda p: Padic.from_int(100, 0, p)
+zero = lambda p: Padic.from_int(0, p, 100)
 # pytest -s --hypothesis-show-statistics
 
 
 @composite
-def primes(draw, min_value=2, max_value=10**9):
+def primes(draw, min_value=1, max_value=10**9):
     p = draw(integers(min_value=min_value, max_value=max_value))
     return nextprime(p)
 
@@ -19,14 +19,14 @@ def padics(draw):
     N = draw(integers(min_value=1, max_value=10**4))
     a = draw(integers())
     p = draw(primes())
-    return Padic.from_int(N if N < 100 else ceil(N * log(2, p)), a, p)
+    return Padic.from_int(a, p, N if N < 100 else ceil(N * log(2, p)))
 
 
 @composite
 def _padics(draw):
     N = draw(integers(min_value=1, max_value=10**4))
     a = draw(integers())
-    return lambda p: Padic.from_int(N if N < 100 else ceil(N * log(2, p)), a, p)
+    return lambda p: Padic.from_int(a, p, N if N < 100 else ceil(N * log(2, p)))
 
 
 @given(primes())
@@ -34,7 +34,7 @@ def test_from_int(p):
     assert 0 == zero(p)
     assert zero(p) == 0
     for i in range(1, 15):
-        assert i == Padic.from_int(100, i, p)
+        assert i == Padic.from_int(i, p, 100)
 
 
 @given(padics())
