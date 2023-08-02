@@ -107,6 +107,8 @@ class Padic:
     def __mod__(self, other: Padic | int) -> Padic:
         if Padic.val(self) >= Padic.val(other, self.p):
             return Padic(max(Padic.INTEGER_PRECISION, self.N), max(Padic.INTEGER_PRECISION, self.N), 0, self.p)
+        if isinstance(other, int):
+            other = Padic.from_int(other, self.p)
         return Padic.from_int(other.s % self.p**(Padic.val(other, self.p) - Padic.val(self)),
                               self.p, max(Padic.INTEGER_PRECISION, self.N), Padic.val(self))
 
@@ -127,6 +129,9 @@ class Padic:
             return out + ''.join(['0']*self.v) + f' + O({self.p}^{self.N})'
         else:
             return out[:self.v] + '.' + out[self.v:] + f' + O({self.p}^{self.N})'
+
+    def __repr__(self) -> str:
+        return str(self)
 
     # Currently works for integer powers only. This may change in the future.
     # Modulo argument is for now ignored.
