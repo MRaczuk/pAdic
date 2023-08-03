@@ -9,18 +9,22 @@ sys.setrecursionlimit(2000)
 
 
 class Padic:
-    # numbers are compared modulo p**PRECISION. Doesn't affect precision of computations.
+    # Numbers are compared modulo p**PRECISION. Doesn't affect precision of computations.
     PRECISION: int = 32
 
-    # default precision for integer to Padic conversion. Please note that this may affect
+    # Default precision for integer to Padic conversion. Please note that this may affect
     # some arithmetic operations and other functions as for example x: Padic *= 7 converts
     # 7 to Padic before performing the multiplication
     INTEGER_PRECISION: int = 64
 
-    # default value of p used in some functions for convenience so that one doesn't have to
+    # Default value of p used in some functions for convenience so that one doesn't have to
     # keep inputting same prime over and over again. Can be set by set_prime function. Ignored
     # if None.
     DEFAULT_PRIME: int | None = None
+
+    # Determines how many digits before period (on left) of a number will be displayed by default.
+    # If set to None displays all of them. Should be non-negative.
+    DISPLAY_PRECISION: int | None = None
 
     # Represents p-adic number as an interval p^v*s + O(p^N)
     def __init__(self, N: int, v: int, s: int, p: int | None = None):
@@ -34,11 +38,11 @@ class Padic:
             v = N
         self.N: int = N
         self.v: int = v
-        self.s: int = s % p**(N - v)
+        self.s: int = s % p ** (N - v)
         self.p: int = p
 
     def __abs__(self) -> int | float:
-        return self.p**(-self.v)
+        return self.p ** (-self.v)
 
     def __eq__(self, other: Padic | int) -> bool:
         diff = self - other
@@ -50,12 +54,12 @@ class Padic:
         if isinstance(other, Padic) and self.p == other.p:
             v_diff = self.v - other.v
             if v_diff > 0:
-                return Padic(min(self.N, other.N), other.v, (self.p**v_diff)*self.s + other.s, self.p)
+                return Padic(min(self.N, other.N), other.v, (self.p ** v_diff) * self.s + other.s, self.p)
             if v_diff < 0:
-                return Padic(min(self.N, other.N), self.v, self.s + (self.p**(-v_diff))*other.s, self.p)
+                return Padic(min(self.N, other.N), self.v, self.s + (self.p ** (-v_diff)) * other.s, self.p)
             return Padic.from_int(self.s + other.s, self.p, min(self.N, other.N), self.v)
         if isinstance(other, int):
-            return self + Padic.from_int(other, self.p)
+            return self + Padic.from_int(other, self.p, self.N)
         else:
             raise RuntimeError(f"Can't add {str(self)} to {str(other)}")
 
@@ -80,9 +84,9 @@ class Padic:
         if isinstance(other, Padic) and self.p == other.p:
             return Padic(min(self.v + other.N, other.v + self.N), self.v + other.v, self.s * other.s, self.p)
         if isinstance(other, int):
-            return self * Padic.from_int(other, self.p)
+            return self * Padic.from_int(other, self.p, self.N + Padic.val(other, self.p) - Padic.val(self))
         else:
-            raise RuntimeError(f"Can't multiply {str(self)} with {str(other)}")
+            raise RuntimeError(f"Can't multiply {self} with {other}")
 
     # This may look weird. That's a bypass to make class work with evaluation of numpy polynomials
     def __rmul__(self, other: int | float) -> Padic:
@@ -94,12 +98,12 @@ class Padic:
         if isinstance(other, Padic) and self.p == other.p:
             N = min(self.v + other.N - 2 * other.v, self.N - other.v)
             v = self.v - other.v
-            s = self.s * pow(other.s, -1, self.p**(N-v))
+            s = self.s * pow(other.s, -1, self.p ** (N - v))
             return Padic(N, v, s, self.p)
         if isinstance(other, int):
-            return self / Padic.from_int(other, self.p)
+            return self / Padic.from_int(other, self.p, self.N + Padic.val(other, self.p) - Padic.val(self))
         else:
-            raise RuntimeError(f"Can't divide {str(self)} by {str(other)}")
+            raise RuntimeError(f"Can't divide {self} by {other}")
 
     def __rtruediv__(self, other: int) -> Padic:
         return Padic.from_int(other, self.p, max(Padic.INTEGER_PRECISION, self.N)) / self
@@ -107,14 +111,14 @@ class Padic:
     def __mod__(self, other: Padic | int) -> Padic:
         if Padic.val(self) >= Padic.val(other, self.p):
             return Padic(max(Padic.INTEGER_PRECISION, self.N), max(Padic.INTEGER_PRECISION, self.N), 0, self.p)
-        return Padic.from_int(self.s % self.p**(Padic.val(other, self.p) - Padic.val(self)),
+        return Padic.from_int(self.s % self.p ** (min(Padic.val(other, self.p) - Padic.val(self), self.N)),
                               self.p, max(Padic.INTEGER_PRECISION, self.N), Padic.val(self))
 
     def __rmod__(self, other: int) -> Padic:
         return Padic.from_int(other, self.p) % self
 
     def __floordiv__(self, other: Padic | int) -> Padic:
-        return (self - self % other)/other
+        return (self - self % other) / other
 
     def __rfloordiv__(self, other: int) -> Padic:
         return Padic.from_int(other, self.p) // self
@@ -124,11 +128,36 @@ class Padic:
             return f"{self.p}-adic + O({self.p}^{self.N})"
         out = base_repr(self.s, self.p)
         if self.v >= 0:
-            return out + ''.join(['0']*self.v) + f' + O({self.p}^{self.N})'
+            if Padic.DISPLAY_PRECISION is None:
+                return out + ''.join(['0'] * self.v) + f' + O({self.p}^{self.N})'
+            num = out + ''.join(['0'] * self.v)
+            # Space is a workaround space cuz now (08.2023) 3-year-old bug causes pycharm not to
+            # print ... if at the start of the string...
+            return ((" ..." if Padic.DISPLAY_PRECISION < len(num) else "") +
+                    num[-Padic.DISPLAY_PRECISION:] + f' + O({self.p}^{self.N})')
         else:
-            return out[:self.v] + '.' + out[self.v:] + f' + O({self.p}^{self.N})'
+            if Padic.DISPLAY_PRECISION is None:
+                return out[:self.v] + '.' + out[self.v:] + f' + O({self.p}^{self.N})'
+            num = out[:self.v]
+            # Same comment as above.
+            return ((" ..." if Padic.DISPLAY_PRECISION < len(num) else "") +
+                    num[-Padic.DISPLAY_PRECISION:] + '.' + out[self.v:] + f' + O({self.p}^{self.N})')
 
     def __repr__(self) -> str:
+        return str(self)
+
+    def __format__(self, format_spec: str) -> str:
+        if format_spec[0] == '.':
+            digits = int(format_spec[1:])
+            prev, Padic.DISPLAY_PRECISION = Padic.DISPLAY_PRECISION, digits
+            out = str(self)
+            Padic.DISPLAY_PRECISION = prev
+            return out
+        if format_spec in ['exact', 'all', 'a', '.None']:
+            prev, Padic.DISPLAY_PRECISION = Padic.DISPLAY_PRECISION, None
+            out = str(self)
+            Padic.DISPLAY_PRECISION = prev
+            return out
         return str(self)
 
     # Currently works for integer powers only. This may change in the future.
@@ -140,16 +169,16 @@ class Padic:
         if power == 1:
             return Padic(self.N, self.v, self.s, self.p)
         if power == -1:
-            return 1/self
-        return self**(power//2) * self**(power//2) * self**(power % 2)
+            return 1 / self
+        return self ** (power // 2) * self ** (power // 2) * self ** (power % 2)
 
     def __lshift__(self, other: int) -> Padic:
         assert isinstance(other, int)
-        return self.p**other * self
+        return self.p ** other * self
 
     def __rshift__(self, other: int) -> Padic:
         assert isinstance(other, int)
-        return self//self.p**other
+        return self // self.p ** other
 
     # Warning! Center isn't necessarily an integer!
     def center(self) -> int | float:
@@ -162,7 +191,7 @@ class Padic:
             return n.v
         if isinstance(n, int) and p is not None:
             if n == 0:
-                return 10**9 + 1
+                return 10 ** 9 + 1
             out = 0
             while n % p == 0:
                 out += 1
@@ -305,14 +334,14 @@ def factorial(n):
 def binomial_coeff(a: Padic | int, b: int, p: int | None = None) -> Padic:
     if p is None:
         p = a.p
-    return Padic.from_int(1, p) if b == 0 else binomial_coeff(a, b - 1)/b * (a-b + 1)
+    return Padic.from_int(1, p) if b == 0 else binomial_coeff(a, b - 1) / b * (a - b + 1)
 
 
 # Convergent for x = 1 + O(p)
 def log(x: int | Padic, p: int | None = None, N=100):
     if p is None:
         p = x.p
-    return -series(lambda n: Padic.from_frac(1, n, p) if n != 0 else Padic.from_int(0, 2), N)(1-x)
+    return -series(lambda n: Padic.from_frac(1, n, p) if n != 0 else Padic.from_int(0, 2), N)(1 - x)
 
 
 # Convergent for |x|_p < p^{-1/{p-1}}
@@ -340,7 +369,7 @@ def cos(x: int | Padic, p: int | None = None, N=100):
 def binomial(x: int | Padic, a: int | Padic, p: int | None = None, N=100):
     if p is None:
         p = x.p
-    return series(lambda n: binomial_coeff(a, n, p), N)(1-x)
+    return series(lambda n: binomial_coeff(a, n, p), N)(1 - x)
 
 
 # Finds approximate root of a polynomial
@@ -364,7 +393,7 @@ def find_approx_root(poly: Polynomial, p: int | None = None, depth: int = 5):
         current_paths = []
         for path in previous_paths:
             for k in range(p):
-                current_paths.append(path + k*ppow)
+                current_paths.append(path + k * ppow)
         for path in current_paths:
             res = check_path(path, i)
             if res == 1:
@@ -390,5 +419,5 @@ def hensel(poly: Polynomial, approx: Padic | int | None = None, p: int | None = 
     der = poly.deriv()
     out = approx
     for _ in range(N):
-        out -= poly(out)/der(out)
+        out -= poly(out) / der(out)
     return out

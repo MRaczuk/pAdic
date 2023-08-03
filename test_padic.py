@@ -1,6 +1,6 @@
 from math import log, ceil
 from sympy import nextprime
-from hypothesis import given, note, assume
+from hypothesis import given, note, assume, settings
 from hypothesis.strategies import integers, composite
 from padic import Padic
 
@@ -181,17 +181,30 @@ def test_mod_0(p):
     assert four(p) % three(p) == one(p) % three(p)
     assert eight(p) % five(p) == three(p) % five(p)
     assert six(p) % zero(p) == six(p)
-    assert six(p) % zero(p) != one(p) or p == 5
 
 
 @given(padics())
+@settings(deadline=15)
 def test_mod_1(x):
     assert x % x == 0
+    assert x % 1 == 0
+    assert x % 0 == x
+
+
+@given(_padics(), _padics(), primes())
+def test_mod_2(_x, _y, p):
+    x, y = _x(p), _y(p)
+    assert (x % y) % y == x % y
+    assert (x + y) % y == x % y
+
+
+@given(_padics(), _padics(), _padics(), primes())
+def test_mod_3(_x, _y, _z, p):
+    x, y, z = _x(p), _y(p), _z(p)
+    assert (x + y * z) % z == x % z
+    assert x % (y * z) == x % (z * y)
+    assert (x + y) % z == ((x % z) + (y % z)) % z
+
 
 
 # FAILED test_padic.py::test_div_1 - assert (1 / (110000000 + O(2^64) * 110000000 + O(2^64))) == ((1 / 110000000 + O(2^64)) * (1 / 110000000 + O(2^64)))
-# Zdaje się, że zachodzą problemy:
-# a) wypisywanie na stringa dla 1/x * 1/x daje więcej cyfr niż powinno przez co nie wszystkie wskazane cyfry są poprawne
-# b) dokładność obliczeń jest niższa niż oczekiwana przy ujemnej waluacji wyniku - N patrzy na liczbę cyfr
-# zamiast na faktyczną dokładność - czyli przy 12 cyfrach po przecinku program błędnie traktuje 43 cyfrowe przybliżenie
-# jako O(2^43) podczas gdy faktycznie daje to jedynie O(2^31)
