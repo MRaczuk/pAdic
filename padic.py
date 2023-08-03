@@ -78,7 +78,7 @@ class Padic:
         if isinstance(other, float) and other == 1.0:
             return self
         if isinstance(other, Padic) and self.p == other.p:
-            return Padic(min(self.v + other.N, other.s + self.N), self.v + other.v, self.s * other.s, self.p)
+            return Padic(min(self.v + other.N, other.v + self.N), self.v + other.v, self.s * other.s, self.p)
         if isinstance(other, int):
             return self * Padic.from_int(other, self.p)
         else:
@@ -94,7 +94,7 @@ class Padic:
         if isinstance(other, Padic) and self.p == other.p:
             N = min(self.v + other.N - 2 * other.v, self.N - other.v)
             v = self.v - other.v
-            s = self.s * pow(other.s, -1, self.p**N)
+            s = self.s * pow(other.s, -1, self.p**(N-v))
             return Padic(N, v, s, self.p)
         if isinstance(other, int):
             return self / Padic.from_int(other, self.p)
@@ -102,14 +102,12 @@ class Padic:
             raise RuntimeError(f"Can't divide {str(self)} by {str(other)}")
 
     def __rtruediv__(self, other: int) -> Padic:
-        return Padic.from_int(other, self.p) / self
+        return Padic.from_int(other, self.p, max(Padic.INTEGER_PRECISION, self.N)) / self
 
     def __mod__(self, other: Padic | int) -> Padic:
         if Padic.val(self) >= Padic.val(other, self.p):
             return Padic(max(Padic.INTEGER_PRECISION, self.N), max(Padic.INTEGER_PRECISION, self.N), 0, self.p)
-        if isinstance(other, int):
-            other = Padic.from_int(other, self.p)
-        return Padic.from_int(other.s % self.p**(Padic.val(other, self.p) - Padic.val(self)),
+        return Padic.from_int(self.s % self.p**(Padic.val(other, self.p) - Padic.val(self)),
                               self.p, max(Padic.INTEGER_PRECISION, self.N), Padic.val(self))
 
     def __rmod__(self, other: int) -> Padic:

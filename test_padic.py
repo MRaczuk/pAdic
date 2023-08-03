@@ -153,18 +153,45 @@ def test_div_0(p):
 
 @given(padics())
 def test_div_1(x):
+    note(str(x))
     assume(x != 0)
     assert x * (1/x) == 1
     assert 1/(x*x) == (1/x) * (1/x)
     assert x/1 == x
     assert 0/x == 0
     assert x/x == 1
+    assert 1/(1/x) == x
 
 
 @given(_padics(), _padics(), primes())
 def test_div_2(_x, _y, p):
     x, y = _x(p), _y(p)
+    note(str(x) + " " + str(y))
     assume(y != 0)
     assert (x/y) * y == x
     assert x * (1/y) == x/y
     assert (-x)/y == -(x/y)
+
+
+@given(primes())
+def test_mod_0(p):
+    assert ten(p) % two(p) == zero(p)
+    assert five(p) % three(p) == two(p) % three(p)
+    assert seven(p) % one(p) == zero(p)
+    assert four(p) % three(p) == one(p) % three(p)
+    assert eight(p) % five(p) == three(p) % five(p)
+    assert six(p) % zero(p) == six(p)
+    assert six(p) % zero(p) != one(p) or p == 5
+
+
+@given(padics())
+def test_mod_1(x):
+    assert x % x == 0
+
+
+# FAILED test_padic.py::test_div_1 - assert (1 / (110000000 + O(2^64) * 110000000 + O(2^64))) == ((1 / 110000000 + O(2^64)) * (1 / 110000000 + O(2^64)))
+# Zdaje się, że zachodzą problemy:
+# a) wypisywanie na stringa dla 1/x * 1/x daje więcej cyfr niż powinno przez co nie wszystkie wskazane cyfry są poprawne
+# b) dokładność obliczeń jest niższa niż oczekiwana przy ujemnej waluacji wyniku - N patrzy na liczbę cyfr
+# zamiast na faktyczną dokładność - czyli przy 12 cyfrach po przecinku program błędnie traktuje 43 cyfrowe przybliżenie
+# jako O(2^43) podczas gdy faktycznie daje to jedynie O(2^31)
