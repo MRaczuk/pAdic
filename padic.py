@@ -12,9 +12,8 @@ class Padic:
     # Numbers are compared modulo p**PRECISION. Doesn't affect precision of computations.
     PRECISION: int = 32
 
-    # Default precision for integer to Padic conversion. Please note that this may affect
-    # some arithmetic operations and other functions as for example x: Padic *= 7 converts
-    # 7 to Padic before performing the multiplication
+    # Default precision for integer to Padic conversion.
+    # This also may affect precision of some arithmetic operations.
     INTEGER_PRECISION: int = 64
 
     # Default value of p used in some functions for convenience so that one doesn't have to
@@ -27,7 +26,7 @@ class Padic:
     DISPLAY_PRECISION: int | None = None
 
     # Represents p-adic number as an interval p^v*s + O(p^N)
-    def __init__(self, N: int, v: int, s: int, p: int | None = None):
+    def __init__(self, N: int, v: int, s: int, p: int | None = None) -> None:
         if p is None:
             p = Padic.DEFAULT_PRIME
         # Assumes p is prime
@@ -106,7 +105,7 @@ class Padic:
             raise RuntimeError(f"Can't divide {self} by {other}")
 
     def __rtruediv__(self, other: int) -> Padic:
-        return Padic.from_int(other, self.p, max(Padic.INTEGER_PRECISION, self.N)) / self
+        return Padic.from_int(other, self.p, self.N + Padic.val(other, self.p) - Padic.val(self)) / self
 
     def __mod__(self, other: Padic | int) -> Padic:
         if Padic.val(self) >= Padic.val(other, self.p):
@@ -115,13 +114,13 @@ class Padic:
                               self.p, max(Padic.INTEGER_PRECISION, self.N), Padic.val(self))
 
     def __rmod__(self, other: int) -> Padic:
-        return Padic.from_int(other, self.p) % self
+        return Padic.from_int(other, self.p, self.v) % self
 
     def __floordiv__(self, other: Padic | int) -> Padic:
         return (self - self % other) / other
 
     def __rfloordiv__(self, other: int) -> Padic:
-        return Padic.from_int(other, self.p) // self
+        return (other - other % self) / self
 
     def __str__(self) -> str:
         if self.p > 31:
@@ -162,10 +161,10 @@ class Padic:
 
     # Currently works for integer powers only. This may change in the future.
     # Modulo argument is for now ignored.
-    def __pow__(self, power: int, modulo=None):
+    def __pow__(self, power: int, modulo=None) -> Padic:
         assert isinstance(power, int)
         if power == 0:
-            return Padic.from_int(1, self.p)
+            return Padic.from_int(1, self.p, max(Padic.INTEGER_PRECISION, self.N))
         if power == 1:
             return Padic(self.N, self.v, self.s, self.p)
         if power == -1:
@@ -264,12 +263,8 @@ class Padic:
             N = Padic.INTEGER_PRECISION
         return Padic.from_int(a, p, N) / Padic.from_int(b, p, N)
 
-    @staticmethod
-    def set_prime(p: int):
-        Padic.DEFAULT_PRIME = p
 
-
-def gcd(a: int, b: int):
+def gcd(a: int, b: int) -> int:
     if b == 0:
         return a
     return gcd(b, a % b)
@@ -300,7 +295,9 @@ class Rational:
         return str(self.num) + "/" + str(self.den)
 
 
-def series(a: Callable[[int], int | Rational | Padic], n: int, z='p'):  # To be changed
+def series(a: Callable[[int], int | Rational | Padic], n: int, z='p') -> \
+                                    Callable[[int | Rational], Rational] \
+                                    | Callable[[int | Padic, int | None], Padic]:
     def u1(x: int | Rational):
         if isinstance(x, int):
             x = Rational(x, 1)
@@ -338,35 +335,35 @@ def binomial_coeff(a: Padic | int, b: int, p: int | None = None) -> Padic:
 
 
 # Convergent for x = 1 + O(p)
-def log(x: int | Padic, p: int | None = None, N=100):
+def log(x: int | Padic, p: int | None = None, N: int = 100) -> Padic:
     if p is None:
         p = x.p
     return -series(lambda n: Padic.from_frac(1, n, p) if n != 0 else Padic.from_int(0, 2), N)(1 - x)
 
 
 # Convergent for |x|_p < p^{-1/{p-1}}
-def exp(x: int | Padic, p: int | None = None, N=100):
+def exp(x: int | Padic, p: int | None = None, N: int = 100) -> Padic:
     if p is None:
         p = x.p
     return series(lambda n: Padic.from_frac(1, factorial(n), p), N)(x)
 
 
 # Convergent for |x|_p < p^{-1/{p-1}}
-def sin(x: int | Padic, p: int | None = None, N=100):
+def sin(x: int | Padic, p: int | None = None, N: int = 100) -> Padic:
     if p is None:
         p = x.p
     return series(lambda n: Padic.from_frac(1, factorial(n), p) * (-1) ** ((n - 1) // 2) if n % 2 else 0, N)(x)
 
 
 # Convergent for |x|_p < p^{-1/{p-1}}
-def cos(x: int | Padic, p: int | None = None, N=100):
+def cos(x: int | Padic, p: int | None = None, N: int = 100) -> Padic:
     if p is None:
         p = x.p
     return series(lambda n: Padic.from_frac(1, factorial(n), p) * (-1) ** ((n + 1) // 2) if (n - 1) % 2 else 0, N)(x)
 
 
 # Convergence radius dependent on p and a
-def binomial(x: int | Padic, a: int | Padic, p: int | None = None, N=100):
+def binomial(x: int | Padic, a: int | Padic, p: int | None = None, N: int = 100) -> Padic:
     if p is None:
         p = x.p
     return series(lambda n: binomial_coeff(a, n, p), N)(1 - x)
@@ -375,7 +372,7 @@ def binomial(x: int | Padic, a: int | Padic, p: int | None = None, N=100):
 # Finds approximate root of a polynomial
 # or doesn't.
 # Currently checks for roots in Z_p only.
-def find_approx_root(poly: Polynomial, p: int | None = None, depth: int = 5):
+def find_approx_root(poly: Polynomial, p: int | None = None, depth: int = 5) -> Padic:
     der = poly.deriv()
 
     def check_path(x, i):
@@ -409,7 +406,7 @@ def find_approx_root(poly: Polynomial, p: int | None = None, depth: int = 5):
 # Doesn't verify correctness of given approximate root.
 # Note that in fact GHL (Generalised Hensel Lemma) for polynomial roots is used
 # Currently checks for roots in Z_p only
-def hensel(poly: Polynomial, approx: Padic | int | None = None, p: int | None = None, N=100):
+def hensel(poly: Polynomial, approx: Padic | int | None = None, p: int | None = None, N: int = 100) -> Padic:
     if p is None:
         p = approx.p
     if approx is None:
