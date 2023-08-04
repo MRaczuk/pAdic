@@ -1,4 +1,4 @@
-# Version 0.2.3.1
+# Version 0.2.4
 from __future__ import annotations
 from typing import Callable
 from numpy import base_repr
@@ -182,6 +182,9 @@ class Padic:
         assert isinstance(other, int)
         return self // self.p ** other
 
+    def __hash__(self) -> int:
+        return self.s
+
     # Warning! Center isn't necessarily an integer!
     def center(self) -> int | float:
         return self.s * (self.p ** self.v)
@@ -193,7 +196,7 @@ class Padic:
             return n.v
         if isinstance(n, int) and p is not None:
             if n == 0:
-                return 10 ** 9 + 1
+                return Padic.INTEGER_PRECISION
             out = 0
             while n % p == 0:
                 out += 1
@@ -334,42 +337,44 @@ def factorial(n):
 def binomial_coeff(a: Padic | int, b: int, p: int | None = None) -> Padic:
     if p is None:
         p = a.p
-    return Padic.from_int(1, p) if b == 0 else binomial_coeff(a, b - 1) / b * (a - b + 1)
+    return Padic.from_int(1, p) if b == 0 else binomial_coeff(a, b - 1, p) / b * (a - b + 1)
 
 
 # Convergent for x = 1 + O(p)
 def log(x: int | Padic, p: int | None = None, N: int = 100) -> Padic:
     if p is None:
         p = x.p
-    return -series(lambda n: Padic.from_frac(1, n, p) if n != 0 else Padic.from_int(0, 2), N)(1 - x)
+    return -series(lambda n: Padic.from_frac(1, n, p) if n != 0 else Padic.from_int(0, p), N)(1 - x, p)
 
 
 # Convergent for |x|_p < p^{-1/{p-1}}
 def exp(x: int | Padic, p: int | None = None, N: int = 100) -> Padic:
     if p is None:
         p = x.p
-    return series(lambda n: Padic.from_frac(1, factorial(n), p), N)(x)
+    return series(lambda n: Padic.from_frac(1, factorial(n), p), N)(x, p)
 
 
 # Convergent for |x|_p < p^{-1/{p-1}}
 def sin(x: int | Padic, p: int | None = None, N: int = 100) -> Padic:
     if p is None:
         p = x.p
-    return series(lambda n: Padic.from_frac(1, factorial(n), p) * (-1) ** ((n - 1) // 2) if n % 2 else 0, N)(x)
+    return series(lambda n: Padic.from_frac(1, factorial(n), p) * (-1) ** ((n - 1) // 2) if n % 2 else 0, N)(x, p)
 
 
 # Convergent for |x|_p < p^{-1/{p-1}}
 def cos(x: int | Padic, p: int | None = None, N: int = 100) -> Padic:
     if p is None:
         p = x.p
-    return series(lambda n: Padic.from_frac(1, factorial(n), p) * (-1) ** ((n + 1) // 2) if (n - 1) % 2 else 0, N)(x)
+    return series(lambda n: Padic.from_frac(1, factorial(n), p) * (-1) ** ((n + 1) // 2) if (n - 1) % 2 else 0, N)(x, p)
 
 
 # Convergence radius dependent on p and a
 def binomial(x: int | Padic, a: int | Padic, p: int | None = None, N: int = 100) -> Padic:
     if p is None:
-        p = x.p
-    return series(lambda n: binomial_coeff(a, n, p), N)(1 - x)
+        if isinstance(x, Padic):
+            p = x.p
+        p = a.p
+    return series(lambda n: binomial_coeff(a, n, p), N)(x - 1, p)
 
 
 # Finds approximate root of a polynomial
