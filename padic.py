@@ -1,4 +1,4 @@
-# Version 0.2.3
+# Version 0.2.3.1
 from __future__ import annotations
 from typing import Callable
 from numpy import base_repr
