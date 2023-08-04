@@ -1,3 +1,4 @@
+# Version 0.2.3
 from __future__ import annotations
 from typing import Callable
 from numpy import base_repr
@@ -146,6 +147,8 @@ class Padic:
         return str(self)
 
     def __format__(self, format_spec: str) -> str:
+        if format_spec == '':
+            return str(self)
         if format_spec[0] == '.':
             digits = int(format_spec[1:])
             prev, Padic.DISPLAY_PRECISION = Padic.DISPLAY_PRECISION, digits
